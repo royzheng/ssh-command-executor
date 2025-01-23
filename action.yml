@@ -1,0 +1,54 @@
+name: 'SSH Command Executor'
+description: 'Execute multiple commands over SSH on a remote server'
+
+inputs:
+  hostname:
+    description: 'Server Hostname or IP'
+    required: true
+    type: string
+  username:
+    description: 'SSH Username'
+    required: true
+    type: string
+  password:
+    description: 'SSH Password (optional if using private_key)'
+    required: false
+    type: string
+    default: ''
+  private_key:
+    description: 'Private SSH Key (optional if using password)'
+    required: false
+    type: string
+    default: ''
+  port:
+    description: 'SSH Port (default is 22)'
+    required: false
+    type: string
+    default: '22'
+  command:
+    description: 'Commands to run on the server, separated by && or ;'
+    required: true
+    type: string
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup SSH and execute commands
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.private_key }} 
+        SSH_PASSWORD: ${{ inputs.password }}
+        SSH_PORT: ${{ inputs.port }}
+      run: |
+        set -e
+        if [ -n "${{ inputs.private_key }}" ]; then
+          mkdir -p ~/.ssh
+          echo "${{ inputs.private_key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${{ inputs.port }} "${{ inputs.username }}@${{ inputs.hostname }}" "${{ inputs.command }}"
+        elif [ -n "${{ inputs.password }}" ]; then
+          sshpass -p "${{ inputs.password }}" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${{ inputs.port }} "${{ inputs.username }}@${{ inputs.hostname }}" "${{ inputs.command }}"
+        else
+          echo "Neither private_key nor password provided. SSH authentication failed."
+          exit 1
+        fi

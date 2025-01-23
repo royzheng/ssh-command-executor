@@ -1,0 +1,46 @@
+name: Publish Action Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of the release (e.g., v1)'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Determine version number
+        id: version
+        run: |
+          if [[ $GITHUB_EVENT_NAME == 'workflow_dispatch' ]]; then
+            VERSION=${{ github.event.inputs.version }}
+            echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          elif [[ $GITHUB_EVENT_NAME == 'push' && -f VERSION ]]; then
+            VERSION=$(cat VERSION)
+            echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          else
+            echo "ERROR: VERSION file is missing or not provided in workflow_dispatch."
+            exit 1
+          fi
+      - name: Set up Git
+        run: |
+          git config --global user.name "royzheng"
+          git config --global user.email "ssh-command-executor@roy.cc"
+      - name: Create version tag
+        run: |
+          git tag ${{ env.VERSION }}
+          git push -f origin ${{ env.VERSION }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: "Release ${{ env.VERSION }}"
+          body: "Release version ${{ env.VERSION }} is now available."
